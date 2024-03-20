@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "645020021504",
+    "project_id": "earthy-72f98",
+    "storage_bucket": "earthy-72f98.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:645020021504:android:89e8c708b37e4435c479e5",
+        "android_client_info": {
+          "package_name": "com.example.earthy"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCNISgLqgFRTzVnaVywthfjsNloNoDDJUY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
