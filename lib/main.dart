@@ -274,7 +274,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
               TextField(
                 controller: _nameController,
                 decoration: const InputDecoration(
-                  labelText: 'Name',
+                  labelText: 'Full Name',
                   prefixIcon: Icon(Icons.person),
                 ),
               ),
@@ -419,12 +419,22 @@ class _OrdersScreenState extends State<OrdersScreen> {
   int _selectedIndex = 1;
 
   Future<List<Map<String, dynamic>>> fetchOrders() async {
-    var ordersSnapshot = await FirebaseFirestore.instance.collection('orders').get();
+    User? user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      return [];
+    }
+
+    var ordersSnapshot = await FirebaseFirestore.instance
+        .collection('orders')
+        .where('userId', isEqualTo: user.uid) // Filter orders by userId
+        .get();
+
     return ordersSnapshot.docs.map((doc) => {
       "orderId": doc.id,
       ...doc.data()
     }).toList();
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -1830,12 +1840,20 @@ class _CartScreenState extends State<CartScreen> {
             ],
           ),
           ElevatedButton(
-            onPressed: () {
-              Navigator.of(context).push(
+            onPressed: () async {
+              bool result = await Navigator.push(
+                context,
                 MaterialPageRoute(builder: (context) => CheckoutScreen(cartItems: items)),
-              );
+              ) ?? false;
+
+              if (result) {
+                setState(() {
+                  // Re-fetch or reset the cart items as needed
+                  cartItems = getCartItems(user!.uid);
+                });
+              }
             },
-            child: Text("Checkout"),
+            child: Text('Checkout'),
             style: ElevatedButton.styleFrom(
               backgroundColor: Theme.of(context).primaryColor,
               padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -2036,8 +2054,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
 
     Future.delayed(Duration(seconds: 2), () {
-      Navigator.of(context).pop();
-      Navigator.of(context).popUntil((route) => route.isFirst); // Navigate back to the first screen
+      Navigator.of(context).pop(); // Dismiss the dialog
+      Navigator.of(context).pop(true); // Pop the CheckoutScreen with 'true' result
     });
   }
 
@@ -2205,6 +2223,37 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     fetchReviews();
     fetchProducerDetails();
     _weightController.addListener(onWeightChanged);
+  }
+
+
+  void incrementWeight() {
+    double currentWeight = double.tryParse(_weightController.text) ?? 0.5;
+    setState(() {
+      currentWeight += 0.25;
+      _weightController.text = currentWeight.toStringAsFixed(2);
+    });
+  }
+
+  void decrementWeight() {
+    double currentWeight = double.tryParse(_weightController.text) ?? 0.5;
+    if (currentWeight > 0.5) {
+      setState(() {
+        currentWeight -= 0.25;
+        if (currentWeight < 0.5) {
+          currentWeight = 0.5;
+        }
+        _weightController.text = currentWeight.toStringAsFixed(2);
+      });
+    }
+  }
+  void enforceMinimumValue() {
+    double currentWeight = double.tryParse(_weightController.text) ?? 0;
+    if (currentWeight < 0.5) {
+      setState(() {
+        _weightController.text = '0.5';
+        _weightController.selection = TextSelection.fromPosition(TextPosition(offset: _weightController.text.length));
+      });
+    }
   }
 
   void onWeightChanged() {
@@ -2432,28 +2481,27 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       Expanded(
                         child: Text('Weight (kg)', style: theme.textTheme.subtitle1),
                       ),
-                      SizedBox(width: 10),
+                      IconButton(
+                        icon: Icon(Icons.remove, color: theme.primaryColor),
+                        onPressed: decrementWeight,
+                      ),
                       Container(
                         width: 100,
+                        alignment: Alignment.center,
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(5.0),
                           border: Border.all(color: theme.primaryColor),
                         ),
                         padding: EdgeInsets.symmetric(horizontal: 8),
-                        child: TextField(
-                          controller: _weightController,
-                          focusNode: _weightFocus,
-                          keyboardType: TextInputType.numberWithOptions(decimal: true),
-                          inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))],
-                          textAlign: TextAlign.center,
+                        child: Text(
+                          '${_weightController.text} kg',
                           style: theme.textTheme.subtitle1,
-                          decoration: InputDecoration(
-                            border: InputBorder.none,
-                            hintText: '0.5',
-                            fillColor: Colors.transparent,
-                          ),
-                          onSubmitted: (_) => _weightFocus.unfocus(),
+                          textAlign: TextAlign.center,
                         ),
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.add, color: theme.primaryColor),
+                        onPressed: incrementWeight,
                       ),
                     ],
                   ),
@@ -2472,7 +2520,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 32.0),
                     ),
                   ),
-                  // Reviews Section
                   SizedBox(height: 24),
                   Text('Producer Reviews', style: theme.textTheme.headline6),
                   ...reviews.map((review) => Padding(
@@ -2513,6 +2560,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       ),
     );
   }
+
+
 }
 
 // Producer app screens:
@@ -2527,6 +2576,8 @@ class _ProducerHomeScreenState extends State<ProducerHomeScreen> {
   List<Map<String, dynamic>> orders = [];
   List<Map<String, dynamic>> reviews = [];
   String producerName = '';
+
+  bool _isOrdersExpanded = false; // To track expansion state
 
   @override
   void initState() {
@@ -2647,9 +2698,8 @@ class _ProducerHomeScreenState extends State<ProducerHomeScreen> {
 
 
 
-
-
   Widget _viewOrdersSection() {
+    int displayCount = _isOrdersExpanded ? orders.length : min(orders.length, 4);
     return Padding(
       padding: const EdgeInsets.all(8.0),
       child: Column(
@@ -2658,37 +2708,51 @@ class _ProducerHomeScreenState extends State<ProducerHomeScreen> {
           Text('Your Orders', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.deepPurple)),
           SizedBox(height: 10),
           orders.isNotEmpty
-              ? ListView.builder(
-            shrinkWrap: true,
-            physics: NeverScrollableScrollPhysics(),
-            itemCount: orders.length,
-            itemBuilder: (context, index) {
-              var order = orders[index];
-              return Card(
-                elevation: 4.0,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                margin: EdgeInsets.symmetric(vertical: 5),
-                child: ListTile(
-                  title: Text('Order ID: ${order['orderId']}', style: TextStyle(color: Colors.deepPurple)),
-                  subtitle: Text('Total amount: ${order['amount']}', style: TextStyle(color: Colors.black54)),
-                  trailing: Icon(Icons.arrow_forward, color: Colors.deepPurple),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => OrderDetailsScreen(orderId: order['orderId']),
-                      ),
-                    );
+              ? Column(
+            children: [
+              ListView.builder(
+                shrinkWrap: true,
+                physics: NeverScrollableScrollPhysics(),
+                itemCount: displayCount, // Use displayCount to determine the number of items to show
+                itemBuilder: (context, index) {
+                  var order = orders[index];
+                  return Card(
+                    elevation: 4.0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    margin: EdgeInsets.symmetric(vertical: 5),
+                    child: ListTile(
+                      title: Text('Order ID: ${order['orderId']}', style: TextStyle(color: Colors.deepPurple)),
+                      subtitle: Text('Total amount: ${order['amount']}', style: TextStyle(color: Colors.black54)),
+                      trailing: Icon(Icons.arrow_forward, color: Colors.deepPurple),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => OrderDetailsScreen(orderId: order['orderId']),
+                          ),
+                        );
+                      },
+                    ),
+                  );
+                },
+              ),
+              if (orders.length > 4) // Show the button only if there are more than 4 orders
+                TextButton(
+                  onPressed: () {
+                    setState(() {
+                      _isOrdersExpanded = !_isOrdersExpanded; // Toggle the expansion state
+                    });
                   },
+                  child: Text(_isOrdersExpanded ? 'Show less' : 'Show more'), // Change button text based on state
                 ),
-              );
-            },
+            ],
           )
               : Center(child: Text("No orders found.", style: TextStyle(color: Colors.deepPurple))),
         ],
       ),
     );
   }
+
 
 
 
@@ -2843,11 +2907,15 @@ class _ProducerHomeScreenState extends State<ProducerHomeScreen> {
         }
       }
 
+      // Sort the orders from most recent to oldest
+      fetchedOrders.sort((a, b) => b['createdAt'].compareTo(a['createdAt']));
+
       setState(() {
         orders = fetchedOrders;
       });
     }
   }
+
 
 
 
