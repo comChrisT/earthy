@@ -7,12 +7,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:io';
 import 'package:path/path.dart' as Path;
-import 'package:file_picker/file_picker.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'dart:async';
 import 'package:intl/intl.dart';
-
 import 'dart:math';
+import 'package:image_picker/image_picker.dart';
 
 
 void main() async {
@@ -427,6 +426,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
     var ordersSnapshot = await FirebaseFirestore.instance
         .collection('orders')
         .where('userId', isEqualTo: user.uid) // Filter orders by userId
+        .orderBy('createdAt', descending: true) // Order by createdAt, newest first
         .get();
 
     return ordersSnapshot.docs.map((doc) => {
@@ -434,6 +434,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
       ...doc.data()
     }).toList();
   }
+
 
 
   @override
@@ -463,7 +464,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                 child: ListTile(
                   leading: Icon(Icons.receipt_long, color: Colors.green),
                   title: Text('Order ID: ${order['orderId']}'),
-                  subtitle: Text('Total: \$${order['amount'].toStringAsFixed(2)}\nStatus: ${order['status']}\nDate: ${DateFormat('yyyy-MM-dd – kk:mm').format(order['createdAt'].toDate())}'),
+                  subtitle: Text('Total: ${order['amount'].toStringAsFixed(2)}€\nStatus: ${order['status']}\nDate: ${DateFormat('yyyy-MM-dd – kk:mm').format(order['createdAt'].toDate())}'),
                   isThreeLine: true,
                   onTap: () {
                     // Go to OrderDetailsScreen on tap
@@ -1167,15 +1168,20 @@ class _ProducerProductsScreenState extends State<ProducerProductsScreen> {
                         children: [
                           ListTile(
                             leading: CircleAvatar(
-                              backgroundImage: NetworkImage(product['producerImageUrl'] ?? 'https://via.placeholder.com/150'),
+                              backgroundImage: NetworkImage(
+                                  (product['producerImageUrl'] != null && product['producerImageUrl'].isNotEmpty)
+                                      ? product['producerImageUrl']
+                                      : 'https://firebasestorage.googleapis.com/v0/b/earthy-72f98.appspot.com/o/default_profile_pic.png?alt=media&token=549eda7d-a11f-4a30-9b4f-ddebd15b8d48'),
                               radius: 24,
                             ),
                             title: Text(product['producerName'] ?? 'Unknown Producer'),
                             subtitle: Text(product['name']),
-                            trailing: Text('€${product['price'].toString()}'),
+                            trailing: Text('€${product['price'].toStringAsFixed(2)}/kg'),
                           ),
                           Image.network(
-                            product['imageUrl'] ?? 'https://via.placeholder.com/150',
+                            product['imageUrl'] != null && product['imageUrl'].isNotEmpty
+                                ? product['imageUrl']
+                                : 'https://firebasestorage.googleapis.com/v0/b/earthy-72f98.appspot.com/o/defaultProductImage.jpeg?alt=media&token=a152dc4e-2514-437d-8862-f6f6ced8627f',
                             width: double.infinity,
                             height: 150,
                             fit: BoxFit.cover,
@@ -1353,7 +1359,10 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                             children: [
                               ListTile(
                                 leading: CircleAvatar(
-                                  backgroundImage: NetworkImage(product['producerImageUrl'] ?? 'https://via.placeholder.com/150'),
+                                  backgroundImage: NetworkImage(
+                                      (product['producerImageUrl'] != null && product['producerImageUrl'].isNotEmpty)
+                                          ? product['producerImageUrl']
+                                          : 'https://firebasestorage.googleapis.com/v0/b/earthy-72f98.appspot.com/o/default_profile_pic.png?alt=media&token=549eda7d-a11f-4a30-9b4f-ddebd15b8d48'),
                                 ),
                                 title: Text(product['producerName'] ?? 'Unknown Producer'),
                               ),
@@ -1608,11 +1617,15 @@ class _ProductListScreenState extends State<ProductListScreen> {
                       children: [
                         ListTile(
                           leading: CircleAvatar(
-                            backgroundImage: NetworkImage(product['producerImageUrl'] ?? 'https://via.placeholder.com/150'),
+                            backgroundImage: NetworkImage(
+                                (product['producerImageUrl'] != null && product['producerImageUrl'].isNotEmpty)
+                                    ? product['producerImageUrl']
+                                    : 'https://firebasestorage.googleapis.com/v0/b/earthy-72f98.appspot.com/o/default_profile_pic.png?alt=media&token=549eda7d-a11f-4a30-9b4f-ddebd15b8d48'
+                            ),
                           ),
                           title: Text(product['producerName'] ?? 'Unknown Producer'),
                           subtitle: Text(product['name']),
-                          trailing: Text('€${product['price'].toString()}'),
+                          trailing: Text('€${product['price'].toStringAsFixed(2)}/kg'),
                         ),
                         Image.network(
                           product['imageUrl'] ?? 'https://via.placeholder.com/150',
@@ -2259,6 +2272,113 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   void onWeightChanged() {
   }
 
+  Future<bool> addProducerReview(int rating, String comment) async {
+    try {
+      String userId = FirebaseAuth.instance.currentUser?.uid ?? '';
+      if (userId.isEmpty) {
+        print("User is not logged in.");
+        return false;
+      }
+
+      String producerId = widget.productData['producerId'];
+      String productId = widget.productData['id'];
+
+      await FirebaseFirestore.instance.collection('reviews').add({
+        'userId': userId,
+        'producerId': producerId,
+        // 'productId': productId,
+        'rating': rating,
+        'comment': comment,
+        'createdAt': Timestamp.now(),
+      });
+
+      return true;
+    } catch (e) {
+      print('Error adding review: $e');
+      return false;
+    }
+  }
+
+
+  void showReviewDialog(BuildContext context) {
+    final TextEditingController commentController = TextEditingController();
+    int tempRating = 0; // Temporarily holds the rating before submission
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: Text('Add Review'),
+              content: SingleChildScrollView(
+                child: ListBody(
+                  children: <Widget>[
+                    Text('Rating:'),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: List.generate(5, (index) {
+                        return IconButton(
+                          icon: Icon(
+                            index < tempRating ? Icons.star : Icons.star_border,
+                            color: Colors.amber,
+                          ),
+                          onPressed: () {
+                            setState(() => tempRating = index + 1);
+                          },
+                        );
+                      }),
+                    ),
+                    TextField(
+                      controller: commentController,
+                      decoration: InputDecoration(
+                        hintText: 'Enter your comment here',
+                      ),
+                      maxLines: 3,
+                    ),
+                  ],
+                ),
+              ),
+              actions: <Widget>[
+                TextButton(
+                  child: Text('Cancel'),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+                TextButton(
+                  child: Text('Submit'),
+                  onPressed: () async {
+                    bool success = await addProducerReview(tempRating, commentController.text);
+                    Navigator.of(context).pop(); // Close the dialog
+
+                    if (success) {
+                      // Show the success SnackBar
+                      final snackBar = SnackBar(
+                        content: Text('Review added successfully'),
+                        behavior: SnackBarBehavior.floating,
+                      );
+                      ScaffoldMessenger.of(context).showSnackBar(snackBar);
+
+                      // Refresh the reviews list
+                      await fetchReviews();
+                    } else {
+                      // Show the error SnackBar
+                      final snackBar = SnackBar(
+                        content: Text('Failed to add review'),
+                        behavior: SnackBarBehavior.floating,
+                      );
+                      ScaffoldMessenger.of(context).showSnackBar(snackBar);
+                    }
+                  },
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+
   Future<void> fetchProducerDetails() async {
     String producerId = widget.productData['producerId'];
     var producerSnapshot = await FirebaseFirestore.instance.collection('users').doc(producerId).get();
@@ -2267,7 +2387,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       var producerData = producerSnapshot.data();
       setState(() {
         _producerName = producerData?['name'] ?? 'Unknown Producer';
-        _producerProfilePictureUrl = producerData?['profilePictureUrl'] ?? '';
+        _producerProfilePictureUrl = producerData?['profilePictureUrl'] ?? 'https://firebasestorage.googleapis.com/v0/b/earthy-72f98.appspot.com/o/default_profile_pic.png?alt=media&token=549eda7d-a11f-4a30-9b4f-ddebd15b8d48';
       });
     }
   }
@@ -2422,12 +2542,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           icon: Icon(Icons.arrow_back, color: theme.primaryColor),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.close, color: theme.primaryColor),
-            onPressed: () => Navigator.of(context).pop(),
-          ),
-        ],
         iconTheme: IconThemeData(color: theme.primaryColor),
       ),
       body: SingleChildScrollView(
@@ -2473,7 +2587,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 children: [
                   Text(product['name'], style: theme.textTheme.headline5?.copyWith(fontWeight: FontWeight.bold)),
                   SizedBox(height: 8),
-                  Text('€${product['price']} /kg', style: theme.textTheme.subtitle1?.copyWith(color: Colors.grey[600])),
+                  Text('€${product['price']}/kg', style: theme.textTheme.subtitle1?.copyWith(color: Colors.grey[600])),
                   SizedBox(height: 16),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -2558,6 +2672,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         selectedIndex: _selectedIndex,
         context: context,
       ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => showReviewDialog(context),
+        tooltip: 'Add Review',
+        child: Icon(Icons.rate_review),
+      ),
+
     );
   }
 
@@ -2576,6 +2696,7 @@ class _ProducerHomeScreenState extends State<ProducerHomeScreen> {
   List<Map<String, dynamic>> orders = [];
   List<Map<String, dynamic>> reviews = [];
   String producerName = '';
+  String producerId = '';
 
   bool _isOrdersExpanded = false; // To track expansion state
 
@@ -2664,7 +2785,7 @@ class _ProducerHomeScreenState extends State<ProducerHomeScreen> {
                 child: ListTile(
                   leading: Image.network(product['imageUrl'], width: 100, height: 100, fit: BoxFit.cover),
                   title: Text(product['name'], style: TextStyle(color: Colors.deepPurple)),
-                  subtitle: Text('Price: ${product['price']} /kg', style: TextStyle(color: Colors.black54)),
+                  subtitle: Text('Price: \n${product['price'].toStringAsFixed(2)}€/kg', style: TextStyle(color: Colors.black54)),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -2713,7 +2834,7 @@ class _ProducerHomeScreenState extends State<ProducerHomeScreen> {
               ListView.builder(
                 shrinkWrap: true,
                 physics: NeverScrollableScrollPhysics(),
-                itemCount: displayCount, // Use displayCount to determine the number of items to show
+                itemCount: displayCount,
                 itemBuilder: (context, index) {
                   var order = orders[index];
                   return Card(
@@ -2722,13 +2843,13 @@ class _ProducerHomeScreenState extends State<ProducerHomeScreen> {
                     margin: EdgeInsets.symmetric(vertical: 5),
                     child: ListTile(
                       title: Text('Order ID: ${order['orderId']}', style: TextStyle(color: Colors.deepPurple)),
-                      subtitle: Text('Total amount: ${order['amount']}', style: TextStyle(color: Colors.black54)),
+                      subtitle: Text('Total amount: \€${double.parse(order['amount'].toString()).toStringAsFixed(2)}\nPlaced on: ${order['createdAt']}', style: TextStyle(color: Colors.black54)),
                       trailing: Icon(Icons.arrow_forward, color: Colors.deepPurple),
                       onTap: () {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => OrderDetailsScreen(orderId: order['orderId']),
+                            builder: (context) => ProducerOrderDetailsScreen(orderId: order['orderId'], producerId: producerId),
                           ),
                         );
                       },
@@ -2756,6 +2877,7 @@ class _ProducerHomeScreenState extends State<ProducerHomeScreen> {
 
 
 
+
   Widget _reviewsSection() {
     return Padding(
       padding: const EdgeInsets.all(8.0),
@@ -2776,7 +2898,11 @@ class _ProducerHomeScreenState extends State<ProducerHomeScreen> {
                 margin: EdgeInsets.symmetric(vertical: 5),
                 child: ListTile(
                   leading: CircleAvatar(
-                    backgroundImage: NetworkImage(review['userProfilePictureUrl'] ?? 'https://via.placeholder.com/150'),
+                    backgroundImage: NetworkImage(
+                        review['userProfilePictureUrl'].isEmpty
+                            ? 'https://firebasestorage.googleapis.com/v0/b/earthy-72f98.appspot.com/o/default_profile_pic.png?alt=media&token=549eda7d-a11f-4a30-9b4f-ddebd15b8d48'
+                            : review['userProfilePictureUrl']
+                    ),
                   ),
                   title: Text(review['userName'] ?? 'Anonymous', style: TextStyle(color: Colors.deepPurple)),
                   subtitle: Column(
@@ -2846,6 +2972,7 @@ class _ProducerHomeScreenState extends State<ProducerHomeScreen> {
       if (userData != null && userData.containsKey('name')) {
         setState(() {
           producerName = userData['name'];
+          producerId = currentUser.uid;
         });
       }
     }
@@ -2903,6 +3030,11 @@ class _ProducerHomeScreenState extends State<ProducerHomeScreen> {
         if (orderSnapshot.exists) {
           Map<String, dynamic> order = orderSnapshot.data()!;
           order['orderId'] = orderSnapshot.id; // Include the order ID in the order data
+          // Include the createdAt field to display the date
+          // Format the createdAt field to exclude seconds
+          DateTime createdAtDate = orderSnapshot.data()!['createdAt']?.toDate() ?? DateTime.now();
+          String formattedDate = DateFormat('yyyy-MM-dd HH:mm').format(createdAtDate);
+          order['createdAt'] = formattedDate;
           fetchedOrders.add(order);
         }
       }
@@ -2915,6 +3047,7 @@ class _ProducerHomeScreenState extends State<ProducerHomeScreen> {
       });
     }
   }
+
 
 
 
@@ -2958,6 +3091,186 @@ class _ProducerHomeScreenState extends State<ProducerHomeScreen> {
 
 }
 
+class ProducerOrderDetailsScreen extends StatefulWidget {
+  final String orderId;
+  final String producerId;
+
+  ProducerOrderDetailsScreen({Key? key, required this.orderId, required this.producerId}) : super(key: key);
+
+  @override
+  _ProducerOrderDetailsScreenState createState() => _ProducerOrderDetailsScreenState();
+}
+
+class _ProducerOrderDetailsScreenState extends State<ProducerOrderDetailsScreen> {
+  Map<String, dynamic>? orderDetails;
+  Map<String, dynamic>? userData;
+  List<Map<String, dynamic>> orderItems = [];
+  List<Map<String, dynamic>> productDetails = [];
+
+  @override
+  void initState() {
+    super.initState();
+    fetchOrderDetails();
+  }
+
+  double getTotalAmountForProducer() {
+    double total = 0.0;
+    for (int i = 0; i < orderItems.length; i++) {
+      total += orderItems[i]['quantity'] * orderItems[i]['price'];
+    }
+    return total;
+  }
+
+  fetchOrderDetails() async {
+    // Fetch order details
+    var orderSnapshot = await FirebaseFirestore.instance.collection('orders').doc(widget.orderId).get();
+    if (orderSnapshot.exists) {
+      orderDetails = orderSnapshot.data();
+      setState(() {});
+
+      // Fetch user data
+      var userSnapshot = await FirebaseFirestore.instance.collection('users').doc(orderDetails!['userId']).get();
+      if (userSnapshot.exists) {
+        userData = userSnapshot.data();
+        setState(() {});
+      }
+
+      // Fetch order items
+      var orderItemsSnapshot = await FirebaseFirestore.instance
+          .collection('orderItems')
+          .where('orderId', isEqualTo: widget.orderId)
+          .get();
+
+      List<Map<String, dynamic>> tempOrderItems = orderItemsSnapshot.docs.map((doc) => doc.data() as Map<String, dynamic>).toList();
+      List<Map<String, dynamic>> filteredOrderItems = [];
+
+      // Check each order item's product for the producerId
+      for (var item in tempOrderItems) {
+        var productSnapshot = await FirebaseFirestore.instance.collection('products').doc(item['productId']).get();
+        if (productSnapshot.exists) {
+          var productData = productSnapshot.data() as Map<String, dynamic>;
+          if (productData['producerId'] == widget.producerId) {
+            filteredOrderItems.add(item);
+            productDetails.add(productData); // Add product details for matching items
+          }
+        }
+      }
+
+      // Update the state with the filtered order items and their product details
+      setState(() {
+        orderItems = filteredOrderItems;
+      });
+    }
+  }
+
+
+  @override
+  Widget build(BuildContext context) {
+    // Calculate the total for the items requested from the producer
+    double totalProducerItems = orderItems.fold(0, (previousValue, element) => previousValue + (element['quantity'] * element['price']));
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Order Details'),
+        elevation: 4.0,
+        backgroundColor: Colors.deepPurple,
+      ),
+      body: orderDetails == null
+          ? Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 32.0),
+                  decoration: BoxDecoration(
+                    color: Colors.deepPurple.shade50,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Order ID: ${widget.orderId}',
+                        style: TextStyle(fontSize: 20, color: Colors.deepPurple),
+                        textAlign: TextAlign.center,
+                      ),
+                      SizedBox(height: 10),
+                      Text('Total Amount: ${orderDetails!['amount']}€', style: TextStyle(fontSize: 16, color: Colors.deepPurple)),
+                      SizedBox(height: 5),
+                      Text('Status: ${orderDetails!['status']}', style: TextStyle(fontSize: 16, color: Colors.deepPurple)),
+                      SizedBox(height: 5),
+                      Text('Delivery Address: ${orderDetails!['deliveryAddress']}', style: TextStyle(fontSize: 16, color: Colors.deepPurple)),
+                      SizedBox(height: 5),
+                      Text('Phone Number: ${orderDetails!['phoneNum'] ?? 'N/A'}', style: TextStyle(fontSize: 16, color: Colors.deepPurple)),
+                    ],
+                  ),
+                ),
+              ),
+              Divider(thickness: 2, height: 32, color: Colors.grey.shade400),
+              Text('Customer Details', style: Theme.of(context).textTheme.headline5?.copyWith(color: Colors.deepPurple)),
+              SizedBox(height: 8),
+              _buildDetailItem('Name: ${userData?['name'] ?? 'N/A'}'),
+              _buildDetailItem('Email: ${userData?['email'] ?? 'N/A'}'),
+              Divider(thickness: 2, height: 32, color: Colors.grey.shade400),
+              Text('Order items requested from you', style: Theme.of(context).textTheme.headline5?.copyWith(color: Colors.deepPurple)),
+              ..._buildOrderItems(),
+              // Display the total for the producer's items
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8.0),
+                child: Text(
+                  'Amount you should collect: ${totalProducerItems.toStringAsFixed(2)}€',
+                  style: TextStyle(fontSize: 20, color: Colors.deepPurple, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+
+  Widget _buildDetailItem(String text) => Padding(
+    padding: const EdgeInsets.only(bottom: 8.0),
+    child: Text(text, style: TextStyle(fontSize: 16, color: Colors.black87)),
+  );
+
+  List<Widget> _buildOrderItems() => orderItems.asMap().map((index, item) {
+    final product = productDetails.isNotEmpty ? productDetails[index] : null;
+    return MapEntry(
+      index,
+      Card(
+        margin: EdgeInsets.symmetric(vertical: 8),
+        elevation: 2,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        child: ListTile(
+          title: Text(
+            product != null ? product['name'] : 'Product',
+            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.deepPurple),
+          ),
+          subtitle: RichText(
+            text: TextSpan(
+              style: TextStyle(color: Colors.black54),
+              children: <TextSpan>[
+                TextSpan(text: 'Quantity: ${item['quantity']} kgs\n'),
+                TextSpan(text: 'Price at time of order: ${item['price']}€ / kg\n'),
+                TextSpan(
+                  text: 'Final Price: ${item['quantity'] * item['price']}€',
+                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.deepPurple),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }).values.toList();
+}
+
 
 class AddProductScreen extends StatefulWidget {
   @override
@@ -2974,16 +3287,19 @@ class _AddProductScreenState extends State<AddProductScreen> {
   bool _isLoading = false;
   File? _image;
 
-  Future<void> _pickImage() async {
-    FilePickerResult? result = await FilePicker.platform.pickFiles(
-      type: FileType.image,
-    );
 
-    if (result != null) {
-      File imageFile = File(result.files.single.path!);
+
+  Future<void> _pickImage() async {
+    final ImagePicker _picker = ImagePicker();
+    // Use the ImagePicker to pick an image
+    final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+
+    if (image != null) {
       setState(() {
-        _image = imageFile;
+        _image = File(image.path); // Update your _image File with the picked file
       });
+    } else {
+      print("No image selected");
     }
   }
 
@@ -3228,15 +3544,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _pickImage() async {
-    FilePickerResult? result = await FilePicker.platform.pickFiles(
-      type: FileType.image,
-    );
+    final ImagePicker _picker = ImagePicker();
+    // Use the ImagePicker to pick an image
+    final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
 
-    if (result != null) {
-      File imageFile = File(result.files.single.path!);
+    if (image != null) {
       setState(() {
-        _image = imageFile;
+        _image = File(image.path); // Update your _image File with the picked file
       });
+    } else {
+      print("No image selected");
     }
   }
 
@@ -3402,7 +3719,7 @@ class _EditProductScreenState extends State<EditProductScreen> {
               TextFormField(
                 controller: _priceController,
                 decoration: InputDecoration(
-                  labelText: 'Price',
+                  labelText: 'Price per kg',
                   prefixIcon: Icon(Icons.euro),
                   border: OutlineInputBorder(),
                   contentPadding: EdgeInsets.symmetric(vertical: 15, horizontal: 10),
@@ -3527,7 +3844,11 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text('Order ID: ${widget.orderId}', style: TextStyle(fontSize: 20, color: Colors.deepPurple)),
+                      Text(
+                        'Order ID: ${widget.orderId}',
+                        style: TextStyle(fontSize: 20, color: Colors.deepPurple),
+                        textAlign: TextAlign.center,
+                      ),
                       SizedBox(height: 10),
                       Text('Total Amount: ${orderDetails!['amount']}€', style: TextStyle(fontSize: 16, color: Colors.deepPurple)),
                       SizedBox(height: 5),

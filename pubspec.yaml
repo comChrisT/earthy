@@ -1,4 +1,4 @@
-name: earthy
+name: Earthy
 description: "An e-commerce application for local producers and consumers"
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
@@ -41,10 +41,10 @@ dependencies:
   cloud_firestore: ^4.15.7
   email_validator: ^2.1.17
   firebase_storage: ^11.6.10
-  file_picker: ^6.2.0
   connectivity_plus: ^5.0.2
   intl: ^0.19.0
   flutter_launcher_icons: ^0.13.1
+  image_picker: ^1.0.7
 
 dev_dependencies:
   flutter_test:
