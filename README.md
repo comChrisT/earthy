@@ -7,7 +7,7 @@ An e-commerce application for local producers and consumers, developed for my th
 
 First, download and install Android studio from its website
 (https://developer.android.com/studio). 
-The version used was Android Studio Iguana. During installation choose Standard installation.
+The version used was Android Studio Iguana. During installation choose Standard installation, accept the terms and follow the installer.
 If you get any errors during the installation about failing to install HAXM, we will fix it later.
 
 Open Android studio and navigate to the plugins screen. 
@@ -23,7 +23,7 @@ Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManage
 Close PowerShell and reopen with admin rights again. Following, go to the "C:\" path using the "cd" command.
 Then, run "choco install dart-sdk" and follow the process (click yes when asked to run a script).
 
-In Android Studio, navigate to settings-> Languages & frameworks -> Dart and tick Enable Dart support for project "earthy".
+In Android Studio, open the project folder (earthy) and navigate to File -> Settings-> Languages & frameworks -> Dart and tick Enable Dart support for project "earthy".
 Then for dart sdk path click on the three dots and find the dart sdk (it should be located in "C:\tools\dart-sdk".
 Also, tick on the Project "earthy" in the box below. Then, click apply and ok.
 
@@ -59,16 +59,23 @@ Open a terminal in Android Studio (bottom left of the window) and run the comman
 Now close and reopen Android Studio again.
 
 Following, click on the device manager icon on the right of the window. Click on the play button to start the simulator.
+
+* In case a simulator is not present in the screen, you will need to add one by clicking the "+" button inside 
+the device manager window. Then, you can pick Pixel 8 under Phones, click next and from the System Image screen, 
+click the download button next to VanillaIceCream in the list, follow the process and then click next & finish. 
+Finally, click the play button.
+
 You will be prompted to Install HAXM if it is not installed. Click on "ok" and follow the instructions.
 If you encounter any issues while installing it:
 Visit "https://github.com/intel/haxm/releases" , download the installer and install it manually.
-Perform the installation and then make sure that in the windows features (you can search windows features in windows search),
-Windows Hypervision Platform and Virtual Machine platform are ticked and then click ok. 
+Perform the installation.
+Make sure that in the windows features (you can search windows features in windows search), Windows Hypervision Platform and 
+Virtual Machine platform are ticked and then click ok. 
 If they are not, you will be prompted to install them.
 Then try closing and reopening Android Studio and start the simulator again .
 
 Now, the play icon at the top middle of the window should be green and you will be able to click on it for main.dart. 
-Click on it and the application should start on the simulator.
+Click on it and the application should start on the simulator. It might take some time the first time. 
 
 ## Sample Accounts for consumers:
 e-mails: 
