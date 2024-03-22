@@ -23,7 +23,7 @@ Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManage
 Close PowerShell and reopen with admin rights again. Following, go to the "C:\" path using the "cd" command.
 Then, run "choco install dart-sdk" and follow the process (click yes when asked to run a script).
 
-In Android Studio, open the project folder (earthy) and navigate to File -> Settings-> Languages & frameworks -> Dart and tick Enable Dart support for project "earthy".
+In Android Studio, open the project folder (since you are using windows, it will be the folder earthy, ignore the _MACOSX folder) and navigate to File -> Settings-> Languages & frameworks -> Dart and tick Enable Dart support for project "earthy".
 Then for dart sdk path click on the three dots and find the dart sdk (it should be located in "C:\tools\dart-sdk".
 Also, tick on the Project "earthy" in the box below. Then, click apply and ok.
 
