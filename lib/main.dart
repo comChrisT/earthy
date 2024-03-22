@@ -152,7 +152,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
       );
 
       if (userCredential.user != null) {
-        // Create document in 'users' collection
+        // Create document in 'users'
         await FirebaseFirestore.instance.collection('users').doc(userCredential.user!.uid).set({
           'name': name,
           'email': email,
@@ -848,10 +848,6 @@ class ProducerCard extends StatelessWidget {
 }
 
 
-
-
-
-
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
   static const String routeName = '/home';
@@ -886,7 +882,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     List<Map<String, dynamic>> producersList = [];
 
-    // Iterate over producers to fetch their user details
+    // Go over producers to fetch their user details
     for (var producerDoc in producersSnapshot.docs) {
       var producerData = producerDoc.data();
 
@@ -910,10 +906,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
 
-
-  void navigateToProducerProducts(String userId) {
-    // implement
-  }
   void navigateToProductListScreen(String categoryName) {
     bool isNewCategory = categoryName == "New"; // Determine if the category is "New"
     Navigator.push(
@@ -924,26 +916,10 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-
-
   Future<Map<String, dynamic>?> getUserData(String userId) async {
     var snapshot = await FirebaseFirestore.instance.collection('users').doc(userId).get();
     return snapshot.data();
   }
-
-
-
-
-  // When typing in search, update the products
-  void _onSearchChanged(String query) {
-    if (query.isNotEmpty) {
-      Navigator.of(context).push(MaterialPageRoute(
-        builder: (context) => SearchResultsScreen(searchQuery: query),
-      ));
-    }
-  }
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -1033,7 +1009,6 @@ class _HomeScreenState extends State<HomeScreen> {
                             return ProducerCard(
                               producerData: producer,
                               onTap: () {
-                                navigateToProducerProducts(producer['userId']);
                               },
                             );
                           },
@@ -1074,7 +1049,6 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 }
-
 
 
 class ProducerProductsScreen extends StatefulWidget {
@@ -1208,10 +1182,6 @@ class _ProducerProductsScreenState extends State<ProducerProductsScreen> {
 }
 
 
-
-
-
-
 Future<List<Map<String, dynamic>>> getProductsData([String? searchQuery]) async {
   Query<Map<String, dynamic>> productsQuery = FirebaseFirestore.instance.collection('products');
 
@@ -1279,9 +1249,6 @@ Future<List<Map<String, dynamic>>> getProductsData([String? searchQuery]) async 
     return [];
   }
 }
-
-
-
 
 
 
@@ -1403,16 +1370,6 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
 }
 
 
-
-
-
-
-
-
-
-
-
-
 class BrowseCategories extends StatelessWidget {
   final Function(String) navigateToCategory;
 
@@ -1530,6 +1487,7 @@ class CategoryCard extends StatelessWidget {
     );
   }
 }
+
 
 // Products Category Screen
 class ProductListScreen extends StatefulWidget {
@@ -1660,11 +1618,6 @@ class _ProductListScreenState extends State<ProductListScreen> {
 
 
 
-
-
-
-
-
 class CartScreen extends StatefulWidget {
   @override
   _CartScreenState createState() => _CartScreenState();
@@ -1747,8 +1700,6 @@ class _CartScreenState extends State<CartScreen> {
       });
     }
   }
-
-
 
   Future<List<CartItemModel>> getCartItems(String userId) async {
     var cartSnapshot = await FirebaseFirestore.instance.collection('carts').doc(userId).get();
@@ -1861,7 +1812,7 @@ class _CartScreenState extends State<CartScreen> {
 
               if (result) {
                 setState(() {
-                  // Re-fetch or reset the cart items as needed
+                  // Reset the cart items
                   cartItems = getCartItems(user!.uid);
                 });
               }
@@ -2067,8 +2018,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
 
     Future.delayed(Duration(seconds: 2), () {
-      Navigator.of(context).pop(); // Dismiss the dialog
-      Navigator.of(context).pop(true); // Pop the CheckoutScreen with 'true' result
+      Navigator.of(context).pop();
+      Navigator.of(context).pop(true);
     });
   }
 
@@ -2167,7 +2118,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   if (value == null || value.isEmpty) {
                     return 'Please enter your phone number';
                   }
-                  // Basic validation for Cypriot phone numbers (8 digits)
+                  // Validation for Cypriot phone numbers (8 digits)
                   if (!RegExp(r'^\d{8}$').hasMatch(value)) {
                     return 'Enter a valid phone number';
                   }
@@ -2190,25 +2141,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -2302,7 +2234,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   void showReviewDialog(BuildContext context) {
     final TextEditingController commentController = TextEditingController();
-    int tempRating = 0; // Temporarily holds the rating before submission
+    int tempRating = 0; // Rating before submission
 
     showDialog(
       context: context,
@@ -2348,23 +2280,20 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   child: Text('Submit'),
                   onPressed: () async {
                     bool success = await addProducerReview(tempRating, commentController.text);
-                    Navigator.of(context).pop(); // Close the dialog
+                    Navigator.of(context).pop();
 
                     if (success) {
-                      // Show the success SnackBar
                       final snackBar = SnackBar(
                         content: Text('Review added successfully'),
-                        behavior: SnackBarBehavior.floating,
+                        behavior: SnackBarBehavior.fixed,
                       );
                       ScaffoldMessenger.of(context).showSnackBar(snackBar);
-
-                      // Refresh the reviews list
+                      // Refresh the reviews
                       await fetchReviews();
                     } else {
-                      // Show the error SnackBar
                       final snackBar = SnackBar(
                         content: Text('Failed to add review'),
-                        behavior: SnackBarBehavior.floating,
+                        behavior: SnackBarBehavior.fixed,
                       );
                       ScaffoldMessenger.of(context).showSnackBar(snackBar);
                     }
@@ -2675,7 +2604,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       floatingActionButton: FloatingActionButton(
         onPressed: () => showReviewDialog(context),
         tooltip: 'Add Review',
-        child: Icon(Icons.rate_review),
+        child: Icon(Icons.add_comment),
       ),
 
     );
@@ -3296,7 +3225,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
     if (image != null) {
       setState(() {
-        _image = File(image.path); // Update your _image File with the picked file
+        _image = File(image.path); // Update the _image File with the picked file
       });
     } else {
       print("No image selected");
@@ -3501,7 +3430,6 @@ class SettingsScreen extends StatefulWidget {
 }
 
 
-
 class _SettingsScreenState extends State<SettingsScreen> {
   bool notificationsEnabled = false;
   User? currentUser = FirebaseAuth.instance.currentUser;
@@ -3545,12 +3473,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _pickImage() async {
     final ImagePicker _picker = ImagePicker();
-    // Use the ImagePicker to pick an image
+    // Pick an image
     final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
 
     if (image != null) {
       setState(() {
-        _image = File(image.path); // Update your _image File with the picked file
+        _image = File(image.path); // Update the _image File with the picked file
       });
     } else {
       print("No image selected");
@@ -3617,10 +3545,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 }
-
-
-
-
 
 
 class EditProductScreen extends StatefulWidget {
